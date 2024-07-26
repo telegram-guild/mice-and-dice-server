@@ -1,26 +1,26 @@
 {
+  "compilerOptions": {
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
+    "outFile": "./build/index.js",
+    "removeComments": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ES5",
+    "typeRoots": [
+      "./node_modules"
+    ],
+    "useUnknownInCatchVariables": false
+  },
   "files": [
-
     // Pirate Panic
     "./src/clans.ts",
     "./src/deck.ts",
     "./src/economy.ts",
     "./src/main.ts",
     "./src/quests.ts",
-    "./src/match.ts",
-  ],
-  "compilerOptions": {
-    "target": "es5",
-    "outFile": "./build/index.js",
-    "strict": true,
-    "removeComments": true,
-    "noUnusedLocals": true,
-    "noImplicitReturns": true,
-    "typeRoots": [
-      "./node_modules"
-    ],
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
-  }
+    "./src/match.ts"
+  ]
 }

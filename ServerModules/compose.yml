@@ -1,0 +1,63 @@
+services:
+  cockroachdb:
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    command:
+      - start-single-node
+      # - '--accept-sql-without-tls'
+      - '--http-addr=:8080'
+      - '--insecure'
+      - '--listen-addr=:26257'
+      # - '--sql-addr=:26257'
+      - '--store=attrs=ssd,path=/var/lib/cockroach/'
+    container_name: cockroachdb
+    expose:
+      - '8080'
+      - '26257'
+    healthcheck:
+      interval: 10s
+      retries: 5
+      start_period: 5s
+      test: curl -f http://cockroachdb:8080/health
+      timeout: 5s
+    image: cockroachdb/cockroach:v23.1.24
+    ports:
+      - '26257:26257'
+      - '8080:8080'
+    restart: always
+    volumes:
+      - cockroach-data:/cockroach/cockroach-data/
+      - data:/var/lib/cockroach/
+  nakama:
+    # extra_hosts:
+    #   - host.docker.internal:host-gateway
+    build: .
+    container_name: nakama
+    depends_on:
+      cockroachdb:
+        condition: service_healthy
+    entrypoint:
+      - /bin/sh
+      - '-ecx'
+      - |
+        /nakama/nakama migrate up --database.address root@cockroachdb:26257 && exec /nakama/nakama --name nakama --config /nakama/data/local.yml --database.address root@cockroachdb:26257/nakama
+    expose:
+      - '7349'
+      - '7350'
+      - '7351'
+    healthcheck:
+      interval: 10s
+      retries: 5
+      start_period: 5s
+      test: curl -f http://nakama:7350
+      timeout: 5s
+    links:
+      - cockroachdb:db
+    ports:
+      - '7349:7349'
+      - '7350:7350'
+      - '7351:7351'
+    restart: always
+volumes:
+  cockroach-data: {}
+  data: {}
