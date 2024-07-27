@@ -1,135 +1,119 @@
-// Copyright 2021 The Nakama Authors & Contributors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+const dummyUserTelegramId = "52953379";
+const dummyUserTelegramUsername = "smhmayboudi";
+const globalLeaderboard = "leaderboard_global";
+const leaderboardIds = [globalLeaderboard];
 
-const dummyUserDeviceId = 'B1DA5988-FC6F-4B6F-8EA9-217DEEC3CDB6';
-const dummyUserDeviceUsername = 'SuperPirate';
+const InitModule: nkruntime.InitModule = function (
+  ctx: nkruntime.Context,
+  logger: nkruntime.Logger,
+  nk: nkruntime.Nakama,
+  initializer: nkruntime.Initializer
+) {
+  // Add at least one user to the system.
+  nk.authenticateCustom(dummyUserTelegramId, dummyUserTelegramUsername, true);
+  // Set up leaderboards.
+  const authoritative = false;
+  const metadata = {};
+  const scoreOperator = nkruntime.Operator.INCREMENTAL;
+  const sortOrder = nkruntime.SortOrder.DESCENDING;
+  const resetSchedule = null;
+  leaderboardIds.forEach((id) => {
+    nk.leaderboardCreate(
+      id,
+      authoritative,
+      sortOrder,
+      scoreOperator,
+      resetSchedule,
+      metadata
+    );
+    logger.info("leaderboard %q created", id);
+  });
+  // Set up hooks.
+  initializer.registerAfterAuthenticateCustom(afterAuthenticateCustom);
+  initializer.registerBeforeJoinGroup(beforeJoinGroupFn);
+  initializer.registerBeforeDeleteGroup(beforeDeleteGroupFn);
+  // Set up RPCs: For Pirate Panic
+  initializer.registerRpc("match_get_score", rpcMatchGetScore);
+  initializer.registerRpc("match_handle_end", rpcMatchHandleEnd);
+  initializer.registerRpc("search_username", rpcSearchUsernameFn);
+  logger.warn("Pirate Panic TypeScript loaded.");
+};
 
-const globalLeaderboard = 'global';
-const leaderboardIds = [
-    globalLeaderboard,
-];
+const afterAuthenticateCustom: nkruntime.AfterHookFunction<
+  nkruntime.Session,
+  nkruntime.AuthenticateCustomRequest
+> = function (
+  ctx: nkruntime.Context,
+  logger: nkruntime.Logger,
+  nk: nkruntime.Nakama,
+  data: nkruntime.Session,
+  req: nkruntime.AuthenticateCustomRequest
+) {
+  afterAuthenticate(ctx, logger, nk, data);
+};
 
-/**
- * Main function.
- */
-const InitModule: nkruntime.InitModule =
-        function(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, initializer: nkruntime.Initializer) {
-    // Add at least one user to the system.
-    nk.authenticateDevice(dummyUserDeviceId, dummyUserDeviceUsername, true);
+function afterAuthenticate(
+  ctx: nkruntime.Context,
+  logger: nkruntime.Logger,
+  nk: nkruntime.Nakama,
+  data: nkruntime.Session
+) {
+  if (!data.created) {
+    // Account already exists.
+    return;
+  }
+  const initialState = {
+    experiencePoint: 0,
+    diceLevels: [1, 1, 1, 1, 1],
+    level: 0,
+    gameStats: {
+      gamesLost: 0,
+      gamesPlayed: 0,
+      gamesWon: 0,
+    },
+  };
+  const writeStats: nkruntime.StorageWriteRequest = {
+    collection: "collection_user_state",
+    key: "user_state",
+    permissionRead: 2,
+    permissionWrite: 1,
+    value: initialState,
+    userId: ctx.userId,
+  };
 
-    // Set up leaderboards.
-    const authoritative = false;
-    const metadata = {};
-    const scoreOperator = nkruntime.Operator.BEST;
-    const sortOrder = nkruntime.SortOrder.DESCENDING;
-    const resetSchedule = null;
-    leaderboardIds.forEach(id => {
-        nk.leaderboardCreate(id, authoritative, sortOrder, scoreOperator, resetSchedule, metadata);
-        logger.info('leaderboard %q created', id);
-    });
+  // TODO: add this userId to the invitee list.
+  // Retrieve the collection from user
+  // Append to list
+  // Save
 
-    // Set up hooks.
-    initializer.registerAfterAuthenticateDevice(afterAuthenticateDeviceFn);
-    initializer.registerAfterAuthenticateFacebook(afterAuthenticateFacebookFn);
-    initializer.registerAfterJoinGroup(afterJoinGroupFn);
-    initializer.registerAfterKickGroupUsers(afterKickGroupUsersFn);
-    initializer.registerAfterLeaveGroup(afterLeaveGroupFn);
-    initializer.registerAfterPromoteGroupUsers(afterPromoteGroupUsersFn);
-    initializer.registerAfterAddFriends(afterAddFriendsFn);
-    initializer.registerBeforeDeleteGroup(beforeDeleteGroupFn);
-
-    // Set up RPCs: For Pirate Panic
-    initializer.registerRpc('search_username', rpcSearchUsernameFn);
-    initializer.registerRpc('swap_deck_card', rpcSwapDeckCard);
-    initializer.registerRpc('upgrade_card', rpcUpgradeCard);
-    initializer.registerRpc('reset_card_collection', rpcResetCardCollection);
-    initializer.registerRpc('add_user_gems', rpcAddUserGems);
-    initializer.registerRpc('load_user_cards', rpcLoadUserCards);
-    initializer.registerRpc('add_random_card', rpcBuyRandomCard);
-    initializer.registerRpc('handle_match_end', rpcHandleMatchEnd);
-    logger.warn('Pirate Panic TypeScript loaded.');
+  // const writeAddFriendQuest = addFriendQuestInit(ctx.userId);
+  // const writeCards: nkruntime.StorageWriteRequest = {
+  //   collection: DeckCollectionName,
+  //   key: DeckCollectionKey,
+  //   permissionRead: DeckPermissionRead,
+  //   permissionWrite: DeckPermissionWrite,
+  //   value: defaultCardCollection(nk, logger, ctx.userId),
+  //   userId: ctx.userId,
+  // };
+  try {
+    nk.storageWrite([writeStats /*writeAddFriendQuest, writeCards*/]);
+  } catch (error) {
+    logger.error("storageWrite error: %q", error);
+    throw error;
+  }
+  logger.debug("new user id: %s account data initialised", ctx.userId);
 }
 
-const afterAuthenticateDeviceFn: nkruntime.AfterHookFunction<nkruntime.Session, nkruntime.AuthenticateDeviceRequest> =
-        function(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, data: nkruntime.Session, req: nkruntime.AuthenticateDeviceRequest) {
-    afterAuthenticate(ctx, logger, nk, data);
-}
-
-const afterAuthenticateFacebookFn: nkruntime.AfterHookFunction<nkruntime.Session, nkruntime.AuthenticateFacebookRequest> =
-        function(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, data: nkruntime.Session, req: nkruntime.AuthenticateFacebookRequest) {
-    afterAuthenticate(ctx, logger, nk, data);
-}
-
-/**
- * Set up the user after first authentication.
- */
-function afterAuthenticate(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, data: nkruntime.Session) {
-    if (!data.created) {
-        // Account already exists.
-        return
-    }
-
-    // For demo purposes set some dummy values for the user.
-    const initialState = {
-        'level': Math.floor(Math.random() * 100),
-        'wins': Math.floor(Math.random() * 100),
-        'gamesPlayed': Math.floor(Math.random() * 200),
-    }
-
-    const writeStats: nkruntime.StorageWriteRequest = {
-        collection: 'stats',
-        key: 'public',
-        permissionRead: 2,
-        permissionWrite: 0,
-        value: initialState,
-        userId: ctx.userId,
-    }
-
-    const writeAddFriendQuest = addFriendQuestInit(ctx.userId);
-
-    // Set the default card collection for the new user.
-    const writeCards: nkruntime.StorageWriteRequest = {
-        collection: DeckCollectionName,
-        key: DeckCollectionKey,
-        permissionRead: DeckPermissionRead,
-        permissionWrite: DeckPermissionWrite,
-        value: defaultCardCollection(nk, logger, ctx.userId),
-        userId: ctx.userId,
-    }
-
-    try {
-        nk.storageWrite([writeStats, writeAddFriendQuest, writeCards]);
-    } catch (error) {
-        logger.error('storageWrite error: %q', error);
-        throw error;
-    }
-
-    logger.debug('new user id: %s account data initialised', ctx.userId);
-}
-
-/**
- * Find a user by a wildcard search on their username.
- */
-const rpcSearchUsernameFn: nkruntime.RpcFunction =
-        function(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
-    const input: any = JSON.parse(payload)
-
-    // NOTE: Must be very careful with custom SQL queries to performance check them.
-    const query = `
+const rpcSearchUsernameFn: nkruntime.RpcFunction = function (
+  ctx: nkruntime.Context,
+  logger: nkruntime.Logger,
+  nk: nkruntime.Nakama,
+  payload: string
+): string {
+  const input: any = JSON.parse(payload);
+  const query = `
     SELECT id, username FROM users WHERE username ILIKE concat($1, '%')
-    `
-    const result = nk.sqlQuery(query, [input.username]);
-
-    return JSON.stringify(result);
-}
+    `;
+  const result = nk.sqlQuery(query, [input.username]);
+  return JSON.stringify(result);
+};

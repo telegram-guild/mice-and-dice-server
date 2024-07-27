@@ -15,12 +15,9 @@
     "useUnknownInCatchVariables": false
   },
   "files": [
-    // Pirate Panic
-    "./src/clans.ts",
-    "./src/deck.ts",
     "./src/economy.ts",
+    "./src/group.ts",
     "./src/main.ts",
-    "./src/quests.ts",
     "./src/match.ts"
   ]
 }
