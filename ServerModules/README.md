@@ -12,6 +12,10 @@ docker compose build
 docker compose up
 ```
 
+```SHELL
+DB_URI=postgresql://smhmayboudi_owner:41phSgeMKTDQ@ep-icy-mud-a2qlfjox.eu-central-1.aws.neon.tech/smhmayboudi?sslmode=require docker compose up
+```
+
 ## Remove
 
 ```SHELL
